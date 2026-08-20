@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-type="sans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Live Auction — Hearts &amp; Harvest Gala</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   eventmate — Live Auction item catalogue (public, read-only)
+
+   Description fill rule:
+   Every card starts at a 3-line description. Grid stretches all
+   cards in a row to the tallest one. If a card ends up with
+   leftover vertical slack (because a neighbour's title wrapped
+   to two or three lines), that slack is spent on WHOLE extra
+   lines of description, up to a hard ceiling of 5. Never more.
+   Cards with short descriptions simply end early and leave the
+   space empty — which is fine, because the footer row stays
+   aligned across the whole row.
+   ============================================================ */
+
+:root{
+  --purple:#5b3fc0;
+  --teal:#00bcb4;
+  --teal-deep:#0f8f8a;
+
+  --paper:#f6f5fa;
+  --paper-2:#efeef6;
+  --card:#ffffff;
+  --line:#e4e1ee;
+  --line-soft:#eeecf5;
+
+  --ink:#1c1330;
+  --ink-2:#453a63;
+  --muted:#6d6489;
+  --muted-2:#948caa;
+
+  --bronze:#a9762a;
+  --bronze-band:#b9832f;
+
+  --display:"Source Serif 4",Georgia,serif;
+  --ui:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+
+  --pad:clamp(16px,4vw,52px);
+  --radius:20px;
+  --fade:26px;
+}
+
+/* Dark theme — same canvas family as the slideshow and auctioneer screen.
+   Must come AFTER the base :root: equal specificity, so source order decides. */
+:root[data-theme="dark"]{
+  --paper:#120a24;
+  --paper-2:#241640;
+  --card:#1b1035;
+  --line:rgba(255,255,255,.11);
+  --line-soft:rgba(255,255,255,.06);
+  --ink:#f6f3fc;
+  --ink-2:#cdc4e6;
+  --muted:#b3a8cf;
+  --muted-2:#8c81ab;
+  --teal-deep:#2ee0d6;
+  --bronze:#e0ae5e;
+  --bronze-band:#b9832f;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);color:var(--ink);font-family:var(--ui);
+  -webkit-font-smoothing:antialiased;min-height:100dvh;
+}
+img{max-width:100%;display:block}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--purple);outline-offset:3px;border-radius:8px}
+
+/* single source of truth for the page gutter — every band uses it */
+.wrap{max-width:1300px;margin:0 auto;padding-left:var(--pad);padding-right:var(--pad)}
+
+/* ---------- masthead ---------- */
+.masthead{position:relative;padding:clamp(26px,5vw,54px) 0 clamp(26px,4vw,44px)}
+.masthead::before{
+  content:"";position:absolute;inset:0 calc(var(--pad) * -1);
+  background:
+    radial-gradient(900px 320px at 8% 0%,rgba(91,63,192,.09),transparent 62%),
+    radial-gradient(700px 300px at 92% 10%,rgba(0,188,180,.10),transparent 60%);
+  pointer-events:none;
+}
+.masthead > *{position:relative}
+
+/* organisation logo, exactly as uploaded — contained, never stretched */
+.brand{margin-bottom:clamp(22px,4vw,38px)}
+.brand img{
+  height:clamp(50px,7.5vw,76px);width:auto;max-width:min(340px,66vw);
+  object-fit:contain;object-position:left center;
+}
+
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:11px;font-weight:600;letter-spacing:.17em;text-transform:uppercase;
+  color:var(--purple);margin:0 0 16px;
+}
+.eyebrow::before{content:"";width:22px;height:1.5px;background:var(--purple);border-radius:2px}
+
+h1{
+  font-family:var(--display);font-weight:600;
+  font-size:clamp(32px,6.2vw,60px);line-height:1.05;letter-spacing:-.025em;
+  margin:0 0 16px;max-width:17ch;
+}
+.lede{margin:0;color:var(--muted);font-size:clamp(15px,2vw,17px);line-height:1.65;max-width:56ch}
+
+/* ---------- toolbar ---------- */
+/* NOTE: the sticky band spans full-bleed, but its contents sit inside
+   .wrap so they line up with the hero and the cards. Vertical padding
+   lives on an inner element so it can't cancel .wrap's gutter. */
+.toolbar{
+  position:sticky;top:0;z-index:40;
+  background:var(--bar-bg,rgba(246,245,250,.85));
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+}
+.toolbar__row{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding-top:11px;padding-bottom:11px;flex-wrap:wrap;
+}
+.tally{display:flex;align-items:baseline;gap:9px;font-size:13px;color:var(--muted)}
+.tally b{font-family:var(--display);font-size:19px;font-weight:600;color:var(--ink)}
+.tally .dot{width:4px;height:4px;border-radius:50%;background:var(--muted-2);display:inline-block;transform:translateY(-3px)}
+
+.filters{display:flex;gap:3px;padding:3px;border-radius:999px;background:var(--paper-2);border:1px solid var(--line-soft)}
+.filter{padding:7px 16px;border-radius:999px;font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap;transition:background .18s,color .18s,box-shadow .18s}
+.filter:hover{color:var(--ink)}
+.filter[aria-pressed="true"]{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(28,19,48,.10)}
+
+/* ---------- grid ---------- */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(310px,1fr));
+  gap:clamp(14px,1.8vw,24px);
+  padding-top:clamp(24px,4vw,42px);padding-bottom:clamp(56px,9vw,100px);
+  align-items:stretch;
+}
+@media (max-width:640px){ .grid{grid-template-columns:1fr} }
+@media (max-width:640px) and (orientation:landscape){ .grid{grid-template-columns:repeat(2,1fr)} }
+
+.item{
+  display:flex;flex-direction:column;
+  position:relative;text-align:left;width:100%;height:100%;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:10px;
+  transition:transform .22s cubic-bezier(.2,.7,.3,1),box-shadow .22s,border-color .22s;
+}
+.item:hover{transform:translateY(-3px);border-color:#d9d4e8;box-shadow:0 20px 40px -26px rgba(28,19,48,.42)}
+
+.item__media{
+  position:relative;aspect-ratio:4/3;flex:0 0 auto;
+  border-radius:13px;overflow:hidden;background:var(--paper-2);isolation:isolate;
+}
+.item__media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.media__blur{
+  position:absolute;inset:0;background-size:cover;background-position:center;
+  filter:blur(26px) saturate(1.25);transform:scale(1.25);opacity:0;
+}
+.item__media.is-fitted img{object-fit:contain}
+.item__media.is-fitted .media__blur{opacity:1}
+
+.pill{
+  position:absolute;top:10px;left:10px;z-index:3;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 11px 6px;border-radius:999px;
+  font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  background:rgba(255,255,255,.94);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 2px 8px rgba(28,19,48,.16);color:var(--teal-deep);
+}
+.pill i{width:6px;height:6px;border-radius:50%;background:currentColor;display:block}
+
+.item__body{
+  flex:1 1 auto;min-height:0;
+  display:flex;flex-direction:column;
+  padding:16px 8px 8px;
+}
+.item__title{
+  font-family:var(--display);font-weight:600;
+  font-size:clamp(19px,2.2vw,22px);line-height:1.22;letter-spacing:-.015em;
+  margin:0 0 9px;flex:0 0 auto;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+/* clamp count is set by script (3 base, 5 ceiling) */
+.item__desc{
+  flex:0 0 auto;
+  margin:0;color:var(--muted);font-size:14px;line-height:1.58;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.item__desc.is-clipped{
+  -webkit-mask-image:linear-gradient(180deg,#000 calc(100% - var(--fade)),transparent 100%);
+  mask-image:linear-gradient(180deg,#000 calc(100% - var(--fade)),transparent 100%);
+}
+/* footer pinned to the bottom of the card, so it aligns across the row */
+.item__more{
+  flex:0 0 auto;margin-top:auto;padding-top:13px;
+  border-top:1px solid var(--line-soft);
+  font-size:12.5px;font-weight:600;color:var(--muted);
+  display:flex;align-items:center;gap:6px;transition:color .18s,gap .18s;
+}
+.item__more::before{content:"";display:block}
+.item:hover .item__more{color:var(--purple);gap:9px}
+/* guarantees a minimum breathing gap between text and the divider */
+.item__gap{flex:0 0 14px}
+
+/* ---------- sold treatment ---------- */
+.item.is-sold{background:#fdfcfa;border-color:#eadfc9}
+:root[data-theme="dark"] .item{background:linear-gradient(180deg,#20143c,#180e2f)}
+:root[data-theme="dark"] .item:hover{border-color:rgba(255,255,255,.2);box-shadow:0 20px 40px -26px rgba(0,0,0,.8)}
+:root[data-theme="dark"] .item.is-sold{background:linear-gradient(180deg,#241a33,#1a1228);border-color:rgba(224,174,94,.24)}
+:root[data-theme="dark"] .item__media{background:#241640}
+:root[data-theme="dark"] .item.is-sold .item__media::after{background:rgba(21,12,40,.36)}
+:root[data-theme="dark"] .pill{background:rgba(18,10,36,.82);box-shadow:0 2px 8px rgba(0,0,0,.5)}
+:root[data-theme="dark"] .toolbar{background:rgba(18,10,36,.86)}
+:root[data-theme="dark"] .filters{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.08)}
+:root[data-theme="dark"] .filter[aria-pressed="true"]{background:#2c1b4d;color:var(--ink)}
+:root[data-theme="dark"] .scrim{background:rgba(8,4,16,.62)}
+:root[data-theme="dark"] .close{background:rgba(28,18,52,.9);color:var(--ink)}
+:root[data-theme="dark"] .empty{background:#1b1035;border-color:rgba(255,255,255,.14)}
+:root[data-theme="dark"] .org__mark,
+:root[data-theme="dark"] .foot{border-color:var(--line)}
+:root[data-theme="dark"] .filter[aria-pressed="true"]{background:var(--card)}
+.item.is-sold .item__media img{filter:saturate(.18) brightness(1.06)}
+.item.is-sold .media__blur{filter:saturate(.18) brightness(1.06) blur(26px)}
+.item.is-sold .item__media::after{content:"";position:absolute;inset:0;z-index:1;background:rgba(255,255,255,.42)}
+.item.is-sold .item__title{color:var(--ink-2)}
+.item.is-sold .pill{color:var(--bronze)}
+.sold-band{
+  position:absolute;z-index:4;top:18px;right:-48px;transform:rotate(38deg);
+  background:var(--bronze-band);color:#fff;
+  font-size:10.5px;font-weight:700;letter-spacing:.24em;
+  padding:6px 58px;text-align:center;box-shadow:0 3px 10px rgba(28,19,48,.24);
+}
+
+/* ---------- empty ---------- */
+.empty{
+  grid-column:1/-1;text-align:center;padding:clamp(46px,9vw,92px) 20px;
+  border:1px dashed #d8d3e6;border-radius:var(--radius);color:var(--muted);background:#fbfaff;
+}
+.empty h3{font-family:var(--display);font-weight:600;font-size:22px;margin:0 0 8px;color:var(--ink)}
+.empty p{margin:0;font-size:14px}
+
+/* ---------- footer ---------- */
+.foot{
+  border-top:1px solid var(--line);padding-top:24px;padding-bottom:44px;
+  display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;
+  font-size:12.5px;color:var(--muted-2);
+}
+.foot a{color:var(--muted);text-decoration:none;font-weight:500}
+.foot a:hover{color:var(--purple)}
+
+/* ---------- detail sheet ---------- */
+.scrim{
+  position:fixed;inset:0;z-index:100;background:rgba(28,19,48,.42);
+  backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);
+  display:grid;place-items:center;padding:clamp(12px,3vw,40px);
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.scrim.open{opacity:1;pointer-events:auto}
+/* Bigger, and the panel takes the photo's own shape — no cushion. */
+.sheet{
+  width:fit-content;max-width:min(1240px,100%);
+  max-height:92dvh;overflow:auto;overscroll-behavior:contain;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:0 40px 80px -40px rgba(28,19,48,.5);
+  transform:translateY(12px) scale(.985);transition:transform .22s cubic-bezier(.2,.7,.3,1);
+  padding:14px;
+}
+.scrim.open .sheet{transform:none}
+.sheet__grid{
+  display:flex;flex-direction:column;align-items:stretch;
+  gap:clamp(6px,1.4vw,18px);
+}
+@media (min-width:860px){ .sheet__grid{flex-direction:row;align-items:center} }
+@media (orientation:landscape) and (max-height:620px){ .sheet__grid{flex-direction:row;align-items:center} }
+.sheet__media{
+  position:relative;flex:0 0 auto;      /* sized to the image by sizeSheetMedia() */
+  border-radius:16px;overflow:hidden;background:var(--paper-2);
+  box-shadow:0 18px 40px -22px rgba(28,19,48,.45);
+}
+.sheet__media img{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;                     /* panel matches ratio, so nothing crops */
+  z-index:2;
+}
+.sheet__body{flex:1 1 auto;min-width:0;padding:clamp(16px,2.4vw,30px) clamp(10px,2vw,24px) clamp(14px,2vw,22px)}
+.sheet__status{
+  display:inline-flex;align-items:center;gap:7px;
+  font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--teal-deep);margin-bottom:12px;
+}
+.sheet__status i{width:6px;height:6px;border-radius:50%;background:currentColor;display:block}
+.sheet__title{
+  font-family:var(--display);font-weight:600;font-size:clamp(24px,3.6vw,36px);
+  line-height:1.14;letter-spacing:-.025em;margin:0 0 16px;
+}
+.sheet__desc{color:var(--ink-2);font-size:15px;line-height:1.72;margin:0;white-space:pre-line}
+.donor{margin-top:clamp(18px,2vw,26px);padding-top:clamp(16px,1.8vw,22px);border-top:1px solid var(--line)}
+.donor__label{display:block;font-size:11px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+/* logo sits ABOVE the name — a logo often looks nothing like the typed name */
+.donor__body{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.donor__logo[hidden]{display:none!important}
+.donor__logo{
+  height:auto;width:auto;max-height:64px;max-width:min(240px,100%);
+  object-fit:contain;display:block;
+}
+:root[data-theme="dark"] .donor__logo{background:#fff;border-radius:10px;padding:9px 13px;max-height:74px}
+.donor__name{font-size:clamp(15px,1.4vw,18px);font-weight:600;color:var(--ink);letter-spacing:-.01em}
+.close{
+  position:absolute;top:12px;right:12px;z-index:5;
+  width:38px;height:38px;border-radius:50%;
+  background:rgba(255,255,255,.94);border:1px solid var(--line);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  display:grid;place-items:center;font-size:19px;line-height:1;color:var(--ink);
+  box-shadow:0 2px 8px rgba(28,19,48,.14);
+}
+.close:hover{background:#fff}
+
+
+
+/* prototype-only controls */
+.proto{
+  position:fixed;top:10px;right:10px;z-index:200;display:flex;gap:8px;align-items:center;
+  opacity:.3;transition:opacity .2s;
+}
+.proto:hover{opacity:1}
+.proto__set{
+  display:flex;gap:4px;padding:4px;border-radius:999px;
+  background:var(--card);border:1px solid var(--line);box-shadow:0 4px 14px -8px rgba(0,0,0,.4);
+}
+.proto__set button{font-size:11px;font-weight:600;color:var(--muted);padding:5px 11px;border-radius:999px}
+.proto__set button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+/* Heading face is switchable for review:
+   serif = Source Serif 4 (quiet, neutral, holds up large)
+   sans  = Inter at 800 with tight tracking */
+:root[data-type="sans"]{--display:"Inter",system-ui,-apple-system,sans-serif}
+:root[data-type="sans"] h1,
+:root[data-type="sans"] .name,
+:root[data-type="sans"] .item__title,
+:root[data-type="sans"] .sheet__title,
+:root[data-type="sans"] .head__title,
+:root[data-type="sans"] .lockup h1,
+:root[data-type="sans"] .picker__title,
+:root[data-type="sans"] .pcard__name,
+:root[data-type="sans"] .tally b,
+:root[data-type="sans"] .empty h3{font-weight:700;letter-spacing:-.032em}
+
+
+
+@media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
+</style>
+</head>
+<body>
+
+<div class="proto">
+  <div class="proto__set" role="group" aria-label="Heading font">
+    <button data-type-set="serif" aria-pressed="false">Serif</button>
+    <button data-type-set="sans" aria-pressed="true">Sans</button>
+  </div>
+  <div class="proto__set" role="group" aria-label="Theme">
+    <button data-theme-set="light" aria-pressed="true">Light</button>
+    <button data-theme-set="dark" aria-pressed="false">Dark</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="brand">
+      <!-- organisation logo uploaded in event settings -->
+      <img id="orgLogo" alt="Hearts &amp; Harvest Foundation">
+    </div>
+    <p class="eyebrow">Live auction</p>
+    <h1>Everything going under the hammer tonight.</h1>
+    <p class="lede">Have a look before the auctioneer starts. Bidding happens in the room — raise your paddle when something here catches you, and the team will settle up with you at the event.</p>
+
+  </header>
+</div>
+
+<div class="toolbar">
+  <div class="wrap">
+    <div class="toolbar__row">
+      <div class="tally">
+        <b id="tallyTotal">12</b> items
+        <span class="dot"></span>
+        <span id="tallySold">3 sold</span>
+      </div>
+      <div class="filters" role="group" aria-label="Filter items">
+        <button class="filter" data-filter="all" aria-pressed="true">All</button>
+        <button class="filter" data-filter="available" aria-pressed="false">Available</button>
+        <button class="filter" data-filter="sold" aria-pressed="false">Sold</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="grid" id="grid"></div>
+  <footer class="foot">
+    <span>Statuses update as each item is closed out. Refresh for the latest.</span>
+    <span>Powered by <a href="#">eventmate</a></span>
+  </footer>
+</div>
+
+<div class="scrim" id="scrim" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet" id="sheet">
+    <div class="sheet__grid">
+      <div class="sheet__media">
+        <button class="close" id="closeBtn" aria-label="Close">&times;</button>
+        <img id="sheetImg" alt="">
+      </div>
+      <div class="sheet__body">
+        <div class="sheet__status" id="sheetStatus"><i></i> Available</div>
+        <h2 class="sheet__title" id="sheetTitle">Item title</h2>
+        <p class="sheet__desc" id="sheetDesc"></p>
+        <div class="donor" id="sheetDonor" hidden>
+          <span class="donor__label">Donated by</span>
+          <div class="donor__body">
+            <img class="donor__logo" id="sheetDonorLogo" alt="" hidden>
+            <span class="donor__name" id="sheetDonorName"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- placeholders (stand in for uploaded files) ---------- */
+function ph(w,h,c1,c2,label){
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/>
+    </linearGradient></defs>
+    <rect width="100%" height="100%" fill="url(#g)"/>
+    <text x="50%" y="50%" font-family="Inter,Helvetica,sans-serif" font-size="${Math.round(Math.min(w,h)/9)}"
+      fill="rgba(255,255,255,.8)" text-anchor="middle" dominant-baseline="middle">${label}</text>
+  </svg>`;
+  return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+}
+
+/* Real stock photos at exact dimensions, so the cover / contain-over-blur
+   logic can be judged on actual imagery. Needs internet; if a photo fails
+   the card silently falls back to the SVG placeholder below it. */
+function pic(seed,w,h){ return `https://picsum.photos/seed/${seed}/${w}/${h}`; }
+document.getElementById("orgLogo").src = "data:image/svg+xml;utf8," + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="452" height="150" viewBox="0 0 452 150">
+     <rect x="4" y="25" width="100" height="100" rx="26" fill="#5b3fc0"/>
+     <path d="M54 96c-16-11-24-19-24-30a13 13 0 0 1 24-7 13 13 0 0 1 24 7c0 11-8 19-24 30z" fill="#00bcb4"/>
+     <text x="126" y="72" font-family="Georgia,serif" font-size="40" fill="#1c1330">Hearts &amp; Harvest</text>
+     <text x="128" y="106" font-family="Helvetica,sans-serif" font-size="21" letter-spacing="5" fill="#6d6489">FOUNDATION</text>
+   </svg>`);
+
+const ITEMS = [
+  {name:"Weekend at Muskoka Lakehouse", sold:true,
+   donor:"The Harmon Family", donorLogo:null,
+   img:pic("lakehouse",1600,1200), fb:ph(1600,1200,"#a78bda","#6d4fc4","4:3"),
+   desc:"Three nights for six guests on Lake Rosseau. Private dock, wood-fired sauna, and a boathouse stocked with kayaks and paddleboards. Available May through October, subject to the owner's calendar. Winter dates can be arranged directly with the family, and the caretaker will stock the kitchen ahead of your arrival if you send a list."},
+  {name:"Chef's Table for Eight", sold:false,
+   donor:"Oduya Hospitality Group", donorLogo:"script",
+   img:pic("chefstable",1000,1400), fb:ph(1000,1400,"#7fd8d2","#189b95","3:4 portrait"),
+   desc:"A seven-course tasting menu prepared in your home by Chef Marisa Oduya, with wine pairings selected for the table. Includes service staff and full cleanup, so nobody in your house touches a dish all evening. Dietary restrictions accommodated with two weeks' notice."},
+  {name:"Signed Concert Guitar", sold:true,
+   donor:"Riverside Music Co.", donorLogo:"roundel",
+   img:pic("guitar77",900,900), fb:ph(900,900,"#c3aef0","#7d5fd0","1:1 square"),
+   desc:"A Gibson J-45 signed by every artist who played the benefit concert series."},
+  {name:"An Evening at the Symphony with the Resident Conductor", sold:false,
+   donor:"Toronto Symphony", donorLogo:null,
+   img:pic("symphonypano",2400,1000), fb:ph(2400,1000,"#9fd0ef","#4d86c4","Panorama"),
+   desc:"Two centre-aisle seats to the full mainstage season, plus opening-night access to the donors' lounge and a backstage tour with the artistic director before the curtain goes up."},
+  {name:"Original Landscape Commission", sold:false,
+   donor:"Bequest of Eleanor Voss", donorLogo:null,
+   img:pic("canvas54",1500,1200), fb:ph(1500,1200,"#efc9dd","#c07aa5","5:4"),
+   desc:"A commissioned oil on canvas, up to 36 by 48 inches, painted from a location of your choosing. Includes a studio visit to review the sketch before the final work begins, and the artist will frame the finished piece in maple or walnut at no extra cost."},
+  {name:"Napa Valley Cellar Collection", sold:true,
+   donor:"Atlas Legal LLP", donorLogo:"crest",
+   img:pic("cellarcrate",1200,1600), fb:ph(1200,1600,"#e8c9a8","#b5773c","3:4 portrait"),
+   desc:"Twelve bottles from three family-run estates, including two library vintages that never reach retail."},
+  {name:"Helicopter Tour and Vineyard Lunch", sold:false,
+   donor:"Dr. Anand & Priya Mehta", donorLogo:null,
+   img:pic("escarpment",1600,1000), fb:ph(1600,1000,"#b6d9c2","#5a9d7a","16:10"),
+   desc:"A scenic flight along the escarpment for four, landing for a long lunch on the terrace at a Beamsville winery. Weather-dependent, valid for one year from the night of the gala."},
+  {name:"Name a Program Room", sold:false,
+   img:pic("programroom",1400,1400), fb:ph(1400,1400,"#c9c2f2","#6c5bc8","1:1 square"),
+   desc:"Naming rights for one of the foundation's youth program rooms for a full year, with a permanent plaque and recognition in the annual report."},
+  {name:"Golf Day at Cabot Links", sold:false,
+   donor:"Northwind Partners", donorLogo:"lockup",
+   img:pic("linksgolf",1800,1200), fb:ph(1800,1200,"#a9dcd6","#2f8f89","3:2"),
+   desc:"A foursome at Cabot Links with caddies, cart, and dinner at the clubhouse. Includes two nights of lodging on the property, with tee times reserved in your name."},
+  {name:"Vintage Rolex Datejust", sold:false,
+   donor:"An Anonymous Donor", donorLogo:null,
+   img:pic("datejust78",800,1200), fb:ph(800,1200,"#d7cdb8","#8a7a58","2:3 portrait"),
+   desc:"A 1978 Datejust in stainless with a champagne dial, recently serviced by a certified watchmaker. Papers included."},
+  {name:"Behind the Scenes at the Symphony", sold:false,
+   img:pic("rehearsal",1600,1200), fb:ph(1600,1200,"#d3bced","#7749b9","4:3"),
+   desc:"Sit in on a full orchestra rehearsal for six, meet the conductor, and take home a signed score."},
+  {name:"One Year of Fresh Flowers", sold:false,
+   donor:"The Whitfield Family", donorLogo:null,
+   img:pic("stems52",1400,1050), fb:ph(1400,1050,"#f0d5cd","#c98670","4:3"),
+   desc:"A seasonal arrangement delivered to your door every second week for twelve months, designed by a local florist who works only with Ontario growers."}
+];
+
+const BASE_LINES = 3;   /* what every card shows by default */
+const MAX_LINES  = 5;   /* hard ceiling, no matter how much slack exists */
+
+const grid = document.getElementById("grid");
+let filter = "all";
+
+function render(){
+  const list = ITEMS.map((it,i)=>({...it,i}))
+    .filter(it => filter==="all" || (filter==="sold") === !!it.sold);
+
+  if(!list.length){
+    grid.innerHTML = `<div class="empty"><h3>Nothing here yet</h3><p>${
+      filter==="sold" ? "No items have been closed out so far tonight." : "Every item has found a home."
+    }</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = list.map(it => `
+    <button class="item ${it.sold?"is-sold":""}" data-i="${it.i}">
+      <div class="item__media">
+        <div class="media__blur" style="background-image:url('${it.img}')"></div>
+        <img src="${it.img}" data-fb="${it.fb}" alt="${it.name}" loading="lazy">
+        <span class="pill"><i></i>${it.sold?"Sold":"Available"}</span>
+        ${it.sold ? `<div class="sold-band">SOLD</div>` : ``}
+      </div>
+      <div class="item__body">
+        <h3 class="item__title">${it.name}</h3>
+        <p class="item__desc">${it.desc}</p>
+        <div class="item__gap"></div>
+        <div class="item__more"><span class="more-label">View item</span> <span aria-hidden="true">→</span></div>
+      </div>
+    </button>
+  `).join("");
+
+  grid.querySelectorAll(".item__media img").forEach(fitImage);
+  requestAnimationFrame(fitDescriptions);
+}
+
+/* cover for near-landscape and square; contain-over-blur for extremes */
+function fitImage(img){
+  const media = img.closest(".item__media");
+  const apply = () => {
+    const r = img.naturalWidth / img.naturalHeight;
+    media.classList.toggle("is-fitted", r < 0.85 || r > 1.9);
+    media.querySelector(".media__blur").style.backgroundImage = `url('${img.currentSrc || img.src}')`;
+  };
+  img.addEventListener("error", () => {
+    const fb = img.dataset.fb;
+    if(fb && img.src !== fb){ img.src = fb; }
+  }, {once:true});
+  img.complete && img.naturalWidth ? apply() : img.addEventListener("load", apply);
+}
+
+/* Spend a row's leftover height on whole extra lines — capped. */
+let fitting = false;
+function fitDescriptions(){
+  const cards = [...grid.querySelectorAll(".item")];
+  if(!cards.length) return;
+  fitting = true;
+
+  // pass 1 — everyone back to base, so row heights reflect the true tallest card
+  cards.forEach(c => c.querySelector(".item__desc").style.webkitLineClamp = BASE_LINES);
+  void grid.offsetHeight;
+
+  // pass 2 — measure each card's slack and convert it to whole lines
+  cards.forEach(card => {
+    const body  = card.querySelector(".item__body");
+    const title = card.querySelector(".item__title");
+    const desc  = card.querySelector(".item__desc");
+    const gap   = card.querySelector(".item__gap");
+    const more  = card.querySelector(".item__more");
+
+    const bs = getComputedStyle(body), ts = getComputedStyle(title), ds = getComputedStyle(desc);
+    const lh = parseFloat(ds.lineHeight);
+
+    const inner = body.clientHeight - parseFloat(bs.paddingTop) - parseFloat(bs.paddingBottom);
+    const avail = inner
+      - title.offsetHeight - parseFloat(ts.marginBottom)
+      - gap.offsetHeight
+      - more.offsetHeight;
+
+    let lines = Math.floor((avail + 0.5) / lh);
+    lines = Math.max(BASE_LINES, Math.min(MAX_LINES, lines));
+    desc.style.webkitLineClamp = lines;
+
+    const clipped = desc.scrollHeight > desc.clientHeight + 1;
+    desc.classList.toggle("is-clipped", clipped);
+    card.querySelector(".more-label").textContent = "View item";
+  });
+
+  requestAnimationFrame(()=>{ fitting = false; });
+}
+
+new ResizeObserver(()=>{ if(!fitting) requestAnimationFrame(fitDescriptions); }).observe(grid);
+window.addEventListener("orientationchange", ()=>setTimeout(fitDescriptions,150));
+if(document.fonts) document.fonts.ready.then(fitDescriptions);
+
+function tally(){
+  const sold = ITEMS.filter(i=>i.sold).length;
+  document.getElementById("tallyTotal").textContent = ITEMS.length;
+  document.getElementById("tallySold").textContent = `${sold} sold`;
+}
+
+document.querySelectorAll(".filter").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    filter = btn.dataset.filter;
+    document.querySelectorAll(".filter").forEach(b=>b.setAttribute("aria-pressed", b===btn));
+    render();
+  });
+});
+
+const sheetMedia = document.querySelector(".sheet__media");
+let sheetRatio = 4/3;
+
+/* Largest box for this photo's own ratio that still leaves the text a
+   readable column. The panel becomes the picture — no letterboxing. */
+function sizeSheetMedia(src){
+  const apply = (r) => {
+    sheetRatio = r;
+    const wide = window.matchMedia("(min-width:860px)").matches
+              || (window.matchMedia("(orientation:landscape)").matches && window.innerHeight <= 620);
+    const pad = Math.min(Math.max(window.innerWidth*0.03,12),40);
+    const sheetW = Math.min(1240, window.innerWidth - pad*2) - 28;   /* minus sheet padding */
+
+    if(!wide){
+      const w = Math.min(sheetW, window.innerWidth - pad*2 - 28);
+      let h = w / r;
+      const cap = window.innerHeight * 0.52;
+      let ww = w;
+      if(h > cap){ h = cap; ww = h * r; }
+      sheetMedia.style.width  = Math.floor(ww) + "px";
+      sheetMedia.style.height = Math.floor(h) + "px";
+      return;
+    }
+
+    const gap = 18, textMin = 340;
+    const maxW = Math.min(sheetW - gap - textMin, sheetW * 0.62);
+    const maxH = window.innerHeight * 0.78;
+    let pw = maxW, phh = pw / r;
+    if(phh > maxH){ phh = maxH; pw = phh * r; }
+    sheetMedia.style.width  = Math.floor(pw) + "px";
+    sheetMedia.style.height = Math.floor(phh) + "px";
+  };
+
+  if(typeof src === "number"){ apply(src); return; }
+  const probe = new Image();
+  probe.onload = () => apply(probe.naturalWidth / probe.naturalHeight);
+  probe.onerror = () => apply(4/3);
+  probe.src = src;
+}
+window.addEventListener("resize", ()=>{ if(scrim.classList.contains("open")) sizeSheetMedia(sheetRatio); });
+
+const scrim = document.getElementById("scrim");
+let lastFocus = null;
+
+grid.addEventListener("click", e=>{
+  const card = e.target.closest(".item");
+  if(!card) return;
+  const it = ITEMS[+card.dataset.i];
+  lastFocus = card;
+  const img = document.getElementById("sheetImg");
+  img.onerror = () => { if(img.src !== it.fb){ img.src = it.fb; sizeSheetMedia(it.fb); } };
+  img.src = it.img; img.alt = it.name;
+  img.style.filter = it.sold ? "saturate(.25) brightness(1.04)" : "";
+  sizeSheetMedia(it.img);
+  document.getElementById("sheetTitle").textContent = it.name;
+  document.getElementById("sheetDesc").textContent = it.desc;
+  const st = document.getElementById("sheetStatus");
+  st.innerHTML = `<i></i>${it.sold?"Sold":"Available"}`;
+  st.style.color = it.sold ? "var(--bronze)" : "var(--teal-deep)";
+
+  /* donor attribution — both fields optional. Show the block only if a name
+     is present; show the logo only if one was uploaded. */
+  const donorWrap = document.getElementById("sheetDonor");
+  const donorBody = donorWrap.querySelector(".donor__body");
+  const donorName = document.getElementById("sheetDonorName");
+  const donorLogo = document.getElementById("sheetDonorLogo");
+  if(it.donor){
+    donorWrap.hidden = false;
+    donorName.textContent = it.donor;
+    if(it.donorLogo){
+      donorLogo.hidden = false;
+      donorLogo.src = donorLogoSVG(it.donorLogo);   /* uploaded file in production */
+      donorBody.classList.add("has-logo");
+    } else {
+      donorLogo.hidden = true;
+      donorLogo.removeAttribute("src");
+      donorBody.classList.remove("has-logo");
+    }
+  } else {
+    donorWrap.hidden = true;
+  }
+  scrim.classList.add("open");
+  document.body.style.overflow="hidden";
+  document.getElementById("closeBtn").focus();
+});
+
+
+/* ---- placeholder DONOR logos: varied real-logo shapes, not wordmarks ----
+   In production these are uploaded files; here we synthesise a few distinct
+   silhouettes (roundel, tall crest, wide lockup, monogram, script) so the
+   layout can be judged against logos that don't match the typed name. */
+function donorLogoSVG(kind){
+  const wrap = (w,h,inner) =>
+    "data:image/svg+xml;utf8," + encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${inner}</svg>`);
+  switch(kind){
+    /* wide horizontal lockup: mark + word, very landscape */
+    case "lockup": return wrap(340,88,
+      `<circle cx="44" cy="44" r="30" fill="#1c3f6e"/><path d="M30 50l10-18 8 12 6-8 10 14z" fill="#fff"/>
+       <text x="92" y="46" font-family="Georgia,serif" font-size="30" font-weight="700" fill="#1c3f6e" dominant-baseline="middle">Northwind</text>
+       <text x="93" y="68" font-family="Inter,sans-serif" font-size="12" letter-spacing="4" fill="#6d7f97" dominant-baseline="middle">PARTNERS</text>`);
+    /* roundel / seal: nearly square */
+    case "roundel": return wrap(120,120,
+      `<circle cx="60" cy="60" r="56" fill="none" stroke="#7a1f2b" stroke-width="4"/>
+       <circle cx="60" cy="60" r="44" fill="#7a1f2b"/>
+       <text x="60" y="58" font-family="Georgia,serif" font-size="34" font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="middle">H</text>
+       <text x="60" y="88" font-family="Inter,sans-serif" font-size="8" letter-spacing="3" fill="#fff" text-anchor="middle">EST 1994</text>`);
+    /* tall crest: portrait, taller than wide */
+    case "crest": return wrap(96,140,
+      `<path d="M48 6l38 14v40c0 34-22 52-38 68C32 112 10 94 10 60V20z" fill="none" stroke="#1f5c3a" stroke-width="4"/>
+       <path d="M48 24l22 8v26c0 20-13 31-22 40-9-9-22-20-22-40V32z" fill="#1f5c3a"/>
+       <text x="48" y="120" font-family="Georgia,serif" font-size="15" font-weight="700" fill="#1f5c3a" text-anchor="middle">VERDANT</text>`);
+    /* monogram tile: square-ish, letters that aren't the donor's words */
+    case "monogram": return wrap(130,110,
+      `<rect x="6" y="6" width="118" height="98" rx="14" fill="#4b3fa8"/>
+       <text x="65" y="58" font-family="Georgia,serif" font-size="46" font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="middle">R&amp;P</text>`);
+    /* script / signature: wide, cursive, low */
+    case "script": return wrap(300,80,
+      `<text x="150" y="46" font-family="'Segoe Script','Brush Script MT',cursive" font-size="42" fill="#8a4b1f" text-anchor="middle" dominant-baseline="middle">Oduya</text>
+       <rect x="70" y="60" width="160" height="2" fill="#c79a6a"/>`);
+    /* stacked emblem: symbol over word, moderately tall */
+    case "emblem": return wrap(150,130,
+      `<rect x="45" y="14" width="60" height="60" rx="12" fill="#0f6f78" transform="rotate(45 75 44)"/>
+       <text x="75" y="112" font-family="Inter,sans-serif" font-size="22" font-weight="800" letter-spacing="1" fill="#0f6f78" text-anchor="middle">MERIDIAN</text>`);
+    default: return wrap(260,70,
+      `<text x="130" y="38" font-family="Inter,sans-serif" font-size="28" font-weight="700" fill="#2b2b2b" text-anchor="middle" dominant-baseline="middle">ATLAS</text>`);
+  }
+}
+
+function close(){
+  scrim.classList.remove("open");
+  document.body.style.overflow="";
+  if(lastFocus) lastFocus.focus();
+}
+document.getElementById("closeBtn").addEventListener("click", close);
+scrim.addEventListener("click", e=>{ if(e.target===scrim) close(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && scrim.classList.contains("open")) close(); });
+
+
+/* prototype theme switch */
+document.querySelectorAll("[data-theme-set]").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.documentElement.dataset.theme = b.dataset.themeSet;
+    document.querySelectorAll("[data-theme-set]").forEach(x=>x.setAttribute("aria-pressed", x===b));
+  });
+});
+
+
+
+
+/* prototype-only: compare heading faces */
+document.querySelectorAll("[data-type-set]").forEach(b=>{
+  b.addEventListener("click", e=>{
+    e.stopPropagation();
+    document.querySelectorAll("[data-type-set]").forEach(x=>x.setAttribute("aria-pressed", x===b));
+    document.documentElement.dataset.type = b.dataset.typeSet;
+  });
+});
+
+
+tally(); render();
+</script>
+</body>
+</html>
